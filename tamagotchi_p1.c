@@ -6,6 +6,7 @@
 #include <stm32wbxx_ll_tim.h>
 #include <tamalib.h>
 #include "tama.h"
+#include "tama_save.h"
 #include "tamagotchi_p1_icons.h"
 
 TamaApp* g_ctx;
@@ -104,15 +105,17 @@ static void tamagotchi_p1_draw_callback(Canvas* const canvas, void* cb_ctx) {
     furi_mutex_release(mutex);
 }
 
-static void tamagotchi_p1_input_callback(InputEvent* input_event, FuriMessageQueue* event_queue) {
-    furi_assert(event_queue);
+static void tamagotchi_p1_input_callback(InputEvent* input_event, void* ctx) {
+    furi_assert(ctx);
+    FuriMessageQueue* event_queue = ctx;
 
     TamaEvent event = {.type = EventTypeInput, .input = *input_event};
     furi_message_queue_put(event_queue, &event, FuriWaitForever);
 }
 
-static void tamagotchi_p1_update_timer_callback(FuriMessageQueue* event_queue) {
-    furi_assert(event_queue);
+static void tamagotchi_p1_update_timer_callback(void* ctx) {
+    furi_assert(ctx);
+    FuriMessageQueue* event_queue = ctx;
 
     TamaEvent event = {.type = EventTypeTick};
     furi_message_queue_put(event_queue, &event, 0);
@@ -191,6 +194,11 @@ static void tamagotchi_p1_init(TamaApp* const ctx) {
         tamalib_register_hal(&ctx->hal);
         tamalib_init((u12_t*)ctx->rom, NULL, 64000);
         tamalib_set_speed(1);
+
+        // Restore prior session's tamagotchi life state if a save file exists.
+        // Best-effort: a missing or invalid save file silently leaves the
+        // emulator with a freshly-initialized memory buffer.
+        tama_app_save_read(TAMA_SAVE_PATH);
 
         // TODO: implement fast forwarding
         ctx->fast_forward_done = true;
@@ -283,6 +291,10 @@ int32_t tamagotchi_p1_app(void* p) {
     if(ctx->rom != NULL) {
         furi_thread_flags_set(furi_thread_get_id(ctx->thread), 1);
         furi_thread_join(ctx->thread);
+
+        // Persist tamagotchi life state to SD card so the pet survives an
+        // app exit. Worker thread is now stopped so g_state_mutex is uncontested.
+        tama_app_save_write(TAMA_SAVE_PATH);
     }
 
     furi_timer_free(timer);

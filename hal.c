@@ -1,7 +1,6 @@
 #include <furi.h>
 #include <furi_hal.h>
 #include <stdlib.h>
-#include <m-string.h>
 #include <stm32wbxx_ll_tim.h>
 #include "tama.h"
 
@@ -37,27 +36,25 @@ static bool_t tamagotchi_p1_hal_is_log_enabled(log_level_t level) {
 static void tamagotchi_p1_hal_log(log_level_t level, char* buff, ...) {
     if(!tamagotchi_p1_hal_is_log_enabled(level)) return;
 
-    string_t string;
+    char buf[128];
     va_list args;
     va_start(args, buff);
-    string_init_vprintf(string, buff, args);
+    vsnprintf(buf, sizeof(buf), buff, args);
     va_end(args);
 
     switch(level) {
     case LOG_ERROR:
-        FURI_LOG_E(TAG_HAL, "%s", string_get_cstr(string));
+        FURI_LOG_E(TAG_HAL, "%s", buf);
         break;
     case LOG_INFO:
-        FURI_LOG_I(TAG_HAL, "%s", string_get_cstr(string));
+        FURI_LOG_I(TAG_HAL, "%s", buf);
         break;
     case LOG_MEMORY:
     case LOG_CPU:
     default:
-        FURI_LOG_D(TAG_HAL, "%s", string_get_cstr(string));
+        FURI_LOG_D(TAG_HAL, "%s", buf);
         break;
     }
-
-    string_clear(string);
 }
 
 static void tamagotchi_p1_hal_sleep_until(timestamp_t ts) {
